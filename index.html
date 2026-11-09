@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rage of the Mage — In the World of Belgarath the Sorcerer</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============================== TITLE ============================== -->
+    <section id="screen-title" class="screen active">
+      <div class="title-card">
+        <p class="kicker">A browser fantasy RPG</p>
+        <h1 class="game-title">Rage of the Mage</h1>
+        <p class="subtitle">In the world of Belgarath the Sorcerer</p>
+        <p class="tagline">In the age before the sleeping god stirred, the dead began to rise.</p>
+        <div class="title-buttons">
+          <button id="btn-new-journey" class="btn btn-primary">New Journey</button>
+          <button id="btn-how" class="btn">How to Play</button>
+          <button id="btn-companions" class="btn">Companions</button>
+          <button id="btn-quests" class="btn">Quests</button>
+          <button id="btn-hero" class="btn">Hero</button>
+        </div>
+        <p class="fineprint">Built with the REA toolkit (Reverse Engineer Anything) · Inspired by Rage of Mage 2 &amp; David Eddings</p>
+      </div>
+    </section>
+
+    <!-- ============================== CREATE ============================== -->
+    <section id="screen-create" class="screen">
+      <div class="panel create-panel">
+        <h2>Choose your path</h2>
+        <p class="dim">In the age of the gods, heroes choose their weapon. The old sorcerer Belgarath saw the
+           choice in you before you even spoke it.</p>
+        <div class="class-grid">
+          <button id="class-warrior" class="class-card">
+            <span class="class-icon">⚔️</span>
+            <span class="class-name">Warrior</span>
+            <span class="class-desc">Sword &amp; bow. High heart, steady blade. Can wield a <em>Power Strike</em>.</span>
+            <span class="class-stats">HP 40 · ATK 8 · DEF 6 · No magic</span>
+          </button>
+          <button id="class-mage" class="class-card">
+            <span class="class-icon">🔥</span>
+            <span class="class-name">Mage</span>
+            <span class="class-desc">Staff &amp; sorcery — the Will and the Word. Spells of flame, will and spirit.</span>
+            <span class="class-stats">HP 22 · MANA 12 · MAG 9 · Spells: Will Bolt, Flame, (Spirit Light)</span>
+          </button>
+        </div>
+        <label class="dim" for="hero-name">Hero name</label>
+        <input id="hero-name" class="text-input" value="Garion" maxlength="16" />
+        <div class="row">
+          <button id="btn-start" class="btn btn-primary">Begin the Journey</button>
+          <button id="btn-back-title" class="btn">Back</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== STORY ============================== -->
+    <section id="screen-story" class="screen">
+      <div class="panel story-panel">
+        <div class="hud-row">
+          <button id="btn-story-companions" class="btn btn-small">Companions</button>
+          <button id="btn-story-quests" class="btn btn-small">Quests</button>
+          <button id="btn-story-hero" class="btn btn-small">Hero</button>
+          <button id="btn-story-title" class="btn btn-small">Title</button>
+        </div>
+        <p class="kicker" id="passage-kicker"></p>
+        <h2 class="passage-title" id="passage-title"></h2>
+        <div id="passage-text" class="passage-text"></div>
+        <div id="passage-choices" class="choices"></div>
+      </div>
+    </section>
+
+    <!-- ============================== COMBAT ============================== -->
+    <section id="screen-combat" class="screen">
+      <div class="combat-wrap">
+        <div class="combat-left">
+          <canvas id="combat-canvas" width="560" height="448"></canvas>
+          <div id="combat-hud" class="combat-hud">
+            <span id="combat-encounter-name" class="combat-encounter-name"></span>
+            <span id="combat-phase" class="combat-phase"></span>
+            <button id="btn-combat-endturn" class="btn btn-primary">End Turn</button>
+          </div>
+        </div>
+        <div class="combat-side">
+          <div id="combat-log" class="combat-log"></div>
+          <div id="combat-units" class="combat-units"></div>
+          <div id="combat-actions" class="combat-actions"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== ENDINGS ============================== -->
+    <section id="screen-end" class="screen">
+      <div class="panel end-panel">
+        <p class="kicker" id="end-kicker"></p>
+        <h2 id="end-title"></h2>
+        <div id="end-text" class="end-text"></div>
+        <div id="end-buttons" class="row"></div>
+      </div>
+    </section>
+
+    <!-- ============================== COMPANIONS ============================== -->
+    <section id="screen-companions" class="screen">
+      <div class="panel">
+        <h2>Companions</h2>
+        <div id="companions-list" class="companions-list"></div>
+        <button id="btn-companions-back" class="btn">Back</button>
+      </div>
+    </section>
+
+    <!-- ============================== QUESTS ============================== -->
+    <section id="screen-quests" class="screen">
+      <div class="panel">
+        <h2>Quests</h2>
+        <div id="quests-list" class="quests-list"></div>
+        <button id="btn-quests-back" class="btn">Back</button>
+      </div>
+    </section>
+
+    <!-- ============================== STATS ============================== -->
+    <section id="screen-stats" class="screen">
+      <div class="panel">
+        <h2>Hero</h2>
+        <div id="stats-sheet" class="stats-sheet"></div>
+        <button id="btn-stats-back" class="btn">Back</button>
+      </div>
+    </section>
+
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

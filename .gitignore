@@ -1,0 +1,6 @@
+# Cloned REA toolkit source (not part of the game)
+rea/
+
+# OS / editor noise
+.DS_Store
+*.log
