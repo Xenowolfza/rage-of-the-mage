@@ -2,7 +2,8 @@
 //  Rage of the Mage — game bootstrap
 // ============================================================
 import { gameState, createCharacter } from "./state.js";
-import { showScreen, renderCombat, renderStory, renderEnd, renderCompanions, renderQuests, renderStats, renderHow, onCombatCanvasClick, endTurnCombat, newJourney, startCombatLoop, stopCombatLoop } from "./ui.js";
+import { showScreen, renderCombat, renderStory, renderEnd, renderCompanions, renderQuests, renderStats, renderHow, onCombatCanvasClick, endTurnCombat, newJourney, startCombatLoop, stopCombatLoop, finishCombat } from "./ui.js";
+import { autoCombat } from "./combat.js";
 import { startPassage } from "./story.js";
 
 function bind(id, handler) {
@@ -36,12 +37,16 @@ function boot() {
   bind("btn-companions", () => { renderCompanions(); showScreen("companions"); });
   bind("btn-quests", () => { renderQuests(); showScreen("quests"); });
 
-  // Combat canvas
+  // Combat canvas + pause
   const canvas = document.getElementById("combat-canvas");
   if (canvas) canvas.addEventListener("click", (e) => onCombatCanvasClick(e));
+  bind("btn-combat-endturn", () => endTurnCombat());
 
   showScreen("title");
 }
+
+// Debug handle for testing from the console: __rage.gameState, __rage.autoCombat(...)
+window.__rage = { gameState, autoCombat, finishCombat, renderCombat };
 
 function startGame() {
   const cls = gameState.cls || "warrior";

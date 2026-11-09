@@ -3,7 +3,7 @@
 // ============================================================
 import { PASSAGES, ENDINGS, QUESTS } from "./data.js";
 import { gameState, startCombat, characterToUnit, createAllyUnit, applyXp } from "./state.js";
-import { showScreen, renderCombat, startCombatLoop } from "./ui.js";
+import { showScreen, renderCombat, startCombatLoop, renderEnd } from "./ui.js";
 import { startCombatRealTime } from "./combat.js";
 
 export function getPassage(id) {
@@ -58,14 +58,14 @@ export function renderStory() {
   renderPassage();
 }
 
-function applyEffect(effect) {
+function applyEffect(effect, nextId) {
   if (!effect) return;
   if (effect.combat) {
     const partyUnits = [];
     const heroUnit = (gameState.character ? characterToUnit(gameState.character) : null);
     if (heroUnit) partyUnits.push(heroUnit);
     for (const ally of gameState.allies) partyUnits.push(createAllyUnit(ally));
-    gameState.pendingNext = effect.next || "the-fellowship";
+    gameState.pendingNext = nextId || effect.next || "the-fellowship";
     gameState.combat = startCombat(effect.combat, partyUnits, gameState.pendingNext);
     startCombatRealTime(gameState.combat);
     gameState.screen = "combat";
@@ -91,9 +91,16 @@ function applyEffect(effect) {
 
 export function chooseChoice(passageId, choice) {
   const p = PASSAGES[passageId];
-  const idx = p.choices.findIndex((c) => c.text === choice.text);
-  const c = p.choices[idx];
-  applyEffect(c.effect);
+  if (!p) return;
+  const c = p.choices.find((x) => x.text === choice.text);
+  if (!c) return;
+  applyEffect(c.effect, c.next);
+  if (gameState.ending) {
+    renderEnd();
+    showScreen("end");
+    return;
+  }
+  if (gameState.screen === "combat" && gameState.combat) return;
   if (c.next) startPassage(c.next);
   renderStory();
 }

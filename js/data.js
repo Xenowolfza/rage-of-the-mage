@@ -75,8 +75,8 @@ export const CLASSES = {
     id: "mage",
     name: "Mage",
     icon: "🔥",
-    hp: 22,
-    mp: 12,
+    hp: 30,
+    mp: 16,
     atk: 3,
     def: 3,
     magic: 9,
@@ -148,22 +148,22 @@ export const ALLIES = {
 export const ENEMIES = {
   skeleton: {
     id: "skeleton", name: "Skeleton", kind: "undead", isBoss: false,
-    hp: 12, maxHp: 12, atk: 5, def: 2, magic: 0, magicDef: 0, moves: 2,
+    hp: 18, maxHp: 18, atk: 4, def: 2, magic: 0, magicDef: 0, moves: 2,
     spells: [], weaponBonus: 1, desc: "Risen from forgotten graves.",
   },
   zombie: {
     id: "zombie", name: "Zombie", kind: "undead", isBoss: false,
-    hp: 18, maxHp: 18, atk: 6, def: 1, magic: 0, magicDef: 0, moves: 2,
+    hp: 26, maxHp: 26, atk: 5, def: 1, magic: 0, magicDef: 0, moves: 2,
     spells: [], weaponBonus: 0, desc: "The dead that hungered too long.",
   },
   wight: {
     id: "wight", name: "Wight", kind: "undead", isBoss: false,
-    hp: 20, maxHp: 20, atk: 8, def: 3, magic: 0, magicDef: 0, moves: 2,
+    hp: 32, maxHp: 32, atk: 7, def: 3, magic: 0, magicDef: 0, moves: 2,
     spells: [], weaponBonus: 1, desc: "A chieftain of the dead.",
   },
   necromancer: {
     id: "necromancer", name: "Necromancer", kind: "undead", isBoss: true,
-    hp: 34, maxHp: 34, atk: 4, def: 2, magic: 10, magicDef: 3, moves: 2,
+    hp: 60, maxHp: 60, atk: 4, def: 2, magic: 10, magicDef: 3, moves: 2,
     spells: ["flame", "will-bolt"], weaponBonus: 0, desc: "Wielder of the dark art. The shadow behind the horde.",
   },
 };

@@ -15,9 +15,10 @@ const UNIT_COLOR = {
 };
 
 // Timing
-const ATTACK_DELAY = 700;   // ms between auto-attacks
-const SPELL_COOLDOWN = 1500; // ms between spell casts
-const MOVE_SPEED = 0.25;    // tiles per second (smooth movement)
+const ATTACK_DELAY = 1100;   // ms between auto-attacks
+const SPELL_COOLDOWN = 1900; // ms between spell casts
+const MOVE_SPEED = 0.25;     // tiles per second (smooth movement)
+const OPENING_GRACE = 1400;  // ms of quiet before the armies engage
 
 export function combatSay(combat, msg) {
   combat.log.push(msg);
@@ -27,8 +28,10 @@ export function combatSay(combat, msg) {
 export function startCombatRealTime(combat) {
   combat.phase = "real-time";
   combat.paused = false;
+  combat.startAt = performance.now() + OPENING_GRACE;
   combat.lastFrameTime = performance.now();
   combat.attackCooldowns = new Map(); // uid -> next-allowed-time
+  combat.moveReady = new Map();       // uid -> next-allowed-move-time
   combat.spellCooldowns = new Map();  // uid -> Map<spellId, next-allowed-time>
   combat.selectedId = null;
   combat.movable = [];
@@ -62,18 +65,28 @@ function canCast(attacker, defender, spell) {
   return dist >= 1 && dist <= spell.range;
 }
 
-function getCooldown(combat, uid) {
-  return combat.attackCooldowns.get(uid) || 0;
+export function getCooldown(combat, uid) {
+  return (combat.attackCooldowns && combat.attackCooldowns.get(uid)) || 0;
 }
 function setCooldown(combat, uid, ms) {
+  if (!combat.attackCooldowns) combat.attackCooldowns = new Map();
   combat.attackCooldowns.set(uid, performance.now() + ms);
 }
 
-function getSpellCooldown(combat, uid, spellId) {
-  const m = combat.spellCooldowns.get(uid);
+function canMoveNow(combat, uid) {
+  return performance.now() >= ((combat.moveReady && combat.moveReady.get(uid)) || 0);
+}
+function markMoved(combat, uid, ms) {
+  if (!combat.moveReady) combat.moveReady = new Map();
+  combat.moveReady.set(uid, performance.now() + ms);
+}
+
+export function getSpellCooldown(combat, uid, spellId) {
+  const m = combat.spellCooldowns && combat.spellCooldowns.get(uid);
   return m ? (m.get(spellId) || 0) : 0;
 }
 function setSpellCooldown(combat, uid, spellId, ms) {
+  if (!combat.spellCooldowns) combat.spellCooldowns = new Map();
   if (!combat.spellCooldowns.has(uid)) combat.spellCooldowns.set(uid, new Map());
   combat.spellCooldowns.get(uid).set(spellId, performance.now() + ms);
 }
@@ -112,22 +125,23 @@ export function tryPlayerAction(combat, action) {
       const now = performance.now();
       if (now < getSpellCooldown(combat, unit.uid, spell.id)) return { ok: false, reason: "cooldown" };
       if (unit.mp < spell.cost) return { ok: false, reason: "no-mana" };
+
+      if (spell.type === "heal") {
+        const allies = combat.units.filter((u) => u.side === "player" && u.alive && u.hp < u.maxHp);
+        let aTarget = null;
+        let bestA = Infinity;
+        for (const a of allies) { const d = manhattan(unit, a); if (d < bestA) { bestA = d; aTarget = a; } }
+        if (!aTarget) return { ok: false, reason: "no-heal-target" };
+        unit.mp -= spell.cost;
+        setSpellCooldown(combat, unit.uid, spell.id, SPELL_COOLDOWN);
+        aTarget.hp = Math.min(aTarget.maxHp, aTarget.hp + spell.power);
+        combat.log.push(`${unit.name} casts ${spell.name} on ${aTarget.name} for ${spell.power}.`);
+        return { ok: true };
+      }
+
       unit.mp -= spell.cost;
       setSpellCooldown(combat, unit.uid, spell.id, SPELL_COOLDOWN);
-      if (spell.type === "heal") {
-        const allies = combat.units.filter((u) => u.side === "player" && u.alive);
-        let aTarget = null; let bestA = Infinity;
-        for (const a of allies) { const d = manhattan(unit, a); if (d < bestA) { bestA = d; aTarget = a; } }
-        if (aTarget && aTarget.hp > 0 && aTarget.hp < aTarget.maxHp) {
-          aTarget.hp += spell.power;
-          combat.log.push(`${unit.name} casts ${spell.name} on ${aTarget.name} for ${spell.power}.`);
-          return { ok: true };
-        }
-        return { ok: false, reason: "no-heal-target" };
-      }
-      const res = resolveAttack(combat, unit, defender, spell);
-      combat.log.push(`${unit.name} casts ${spell.name} on ${defender.name} for ${res.dmg}.`);
-      if (defender.hp <= 0) defender.alive = false;
+      resolveAttack(combat, unit, defender, spell);
       return { ok: true };
     }
     case "pause": {
@@ -139,56 +153,82 @@ export function tryPlayerAction(combat, action) {
   }
 }
 
-export function autoCombat(combat, dt) {
-  if (combat.phase !== "real-time" || combat.paused) return;
-  const now = performance.now();
+const MOVE_DELAY = 320; // ms between AI movement steps
+const ENEMY_ATTACK_DELAY = 1350; // the dead are slow — heroes swing a little faster
 
-  // Enemies: auto-move toward nearest player, auto-attack
-  const players = combat.units.filter((u) => u.side === "player" && u.alive);
-  const enemies = combat.units.filter((u) => u.side === "enemy" && u.alive);
+function nearestUnitFrom(u, list) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const other of list) {
+    const d = manhattan(u, other);
+    if (d < bestDist) { bestDist = d; best = other; }
+  }
+  return best;
+}
 
-  for (const e of enemies) {
-    // find nearest player
-    let target = null; let best = Infinity;
-    for (const p of players) { const d = manhattan(e, p); if (d < best) { best = d; target = p; } }
+function autoCastAt(combat, u, target, now) {
+  if (!u.spells || !u.spells.length) return false;
+  const spell = u.spells
+    .map((sid) => SPELLS[sid])
+    .filter((s) => s && s.type === "damage" && u.mp >= s.cost)
+    .sort((a, b) => (b.power || 0) - (a.power || 0))[0];
+  if (!spell) return false;
+  if (now < getSpellCooldown(combat, u.uid, spell.id)) return false;
+  const dist = manhattan(u, target);
+  if (dist < 1 || dist > spell.range) return false;
+  u.mp -= spell.cost;
+  setSpellCooldown(combat, u.uid, spell.id, SPELL_COOLDOWN);
+  resolveAttack(combat, u, target, spell);
+  return true;
+}
+
+function stepToward(combat, u, target) {
+  if (!canMoveNow(combat, u.uid)) return false;
+  const reachable = computeMovable(combat, u);
+  let bestMove = null;
+  let bestScore = Infinity;
+  for (const t of reachable) {
+    if (t.dist <= 0) continue;
+    const score = manhattan(t, target) + t.dist * 0.01;
+    if (score < bestScore) { bestScore = score; bestMove = t; }
+  }
+  if (!bestMove) return false;
+  u.x = bestMove.x;
+  u.y = bestMove.y;
+  markMoved(combat, u.uid, MOVE_DELAY);
+  return true;
+}
+
+function runSide(combat, side, now) {
+  const foes = combat.units.filter((u) => u.alive && u.side !== side);
+  const actors = combat.units.filter((u) => u.alive && u.side === side);
+  if (!foes.length) return;
+  for (const u of actors) {
+    const target = nearestUnitFrom(u, foes);
     if (!target) continue;
 
-    // auto-attack if in range and cooldown ready
-    const inRange = canStrike(e, target) || (e.bow && manhattan(e, target) <= (e.bowRange || 4));
-    if (inRange && now >= getCooldown(combat, e.uid)) {
-      const res = resolveAttack(combat, e, target, null);
-      setCooldown(combat, e.uid, ATTACK_DELAY);
-      combat.log.push(`${e.name} strikes ${target.name} for ${res.dmg}.`);
-      if (target.hp <= 0) target.alive = false;
+    // 1) shoot / strike if something is in weapon range and the swing is ready
+    const inRange = canStrike(u, target) || (u.bow && manhattan(u, target) <= (u.bowRange || 4));
+    if (inRange && now >= getCooldown(combat, u.uid)) {
+      resolveAttack(combat, u, target, null);
+      setCooldown(combat, u.uid, side === "enemy" ? ENEMY_ATTACK_DELAY : ATTACK_DELAY);
       continue;
     }
 
-    // move toward target (one step)
-    const reachable = computeMovable(combat, e);
-    let bestMove = null; let bestScore = Infinity;
-    for (const t of reachable) {
-      if (t.dist <= 0) continue;
-      const d = manhattan(t, target);
-      const score = d + t.dist * 0.01;
-      if (score < bestScore) { bestScore = score; bestMove = t; }
-    }
-    if (bestMove) {
-      e.x = bestMove.x; e.y = bestMove.y;
-    }
+    // 2) cast a damage spell if it can reach
+    if (autoCastAt(combat, u, target, now)) continue;
 
-    // enemy spellcast
-    if (e.spells && e.spells.length) {
-      const dmgSpell = e.spells.map((sid) => SPELLS[sid]).find((s) => s && s.type === "damage");
-      if (dmgSpell && canCast(e, target, dmgSpell) && now >= getSpellCooldown(combat, e.uid, dmgSpell.id) && e.mp >= dmgSpell.cost && manhattan(e, target) <= dmgSpell.range) {
-        e.mp -= dmgSpell.cost;
-        setSpellCooldown(combat, e.uid, dmgSpell.id, SPELL_COOLDOWN);
-        const res = resolveAttack(combat, e, target, dmgSpell);
-        combat.log.push(`${e.name} casts ${dmgSpell.name} on ${target.name} for ${res.dmg}.`);
-        if (target.hp <= 0) target.alive = false;
-      }
-    }
+    // 3) otherwise close the distance
+    stepToward(combat, u, target);
   }
+}
 
+export function autoCombat(combat, dt) {
+  if (combat.phase !== "real-time" || combat.paused) return;
+  const now = performance.now();
+  if (combat.startAt && now < combat.startAt) return;
+  runSide(combat, "player", now);
+  runSide(combat, "enemy", now);
   checkCombatEnd(combat);
 }
 
@@ -199,6 +239,10 @@ export function drawCombat(combat, canvas) {
   const ctx = canvas.getContext("2d");
   const { w, h } = combat.terrain;
   const ts = 56;
+
+  // keep the drawing buffer in sync with the map size (14-wide maps overflow a fixed canvas)
+  if (canvas.width !== w * ts) canvas.width = w * ts;
+  if (canvas.height !== h * ts) canvas.height = h * ts;
 
   const gradient = ctx.createLinearGradient(0, 0, w * ts, h * ts);
   gradient.addColorStop(0, "#1a140e");
@@ -216,15 +260,10 @@ export function drawCombat(combat, canvas) {
     }
   }
 
-  // pause overlay text
+  // pause dim (banner is drawn after the units)
   if (combat.paused) {
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.fillRect(0, 0, w * ts, h * ts);
-    ctx.fillStyle = "#ffd27a";
-    ctx.font = "bold 32px serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("PAUSED — give orders, then resume", w * ts / 2, h * ts / 2);
   }
 
   // units
@@ -248,8 +287,8 @@ export function drawCombat(combat, canvas) {
       ctx.stroke();
     }
 
-    // move-range halo (only when selected and not paused)
-    if (!combat.paused && combat.selectedId === u.uid) {
+    // move-range halo
+    if (combat.selectedId === u.uid) {
       ctx.fillStyle = "rgba(143, 202, 122, 0.12)";
       ctx.beginPath();
       ctx.arc(cx, cy, 3 * ts, 0, Math.PI * 2);
@@ -314,7 +353,7 @@ export function drawCombat(combat, canvas) {
   }
 
   // movable tiles
-  if (!combat.paused && combat.selectedId) {
+  if (combat.selectedId) {
     const u = combat.units.find((x) => x.uid === combat.selectedId);
     if (u && u.alive) {
       for (const t of combat.movable) {
@@ -326,5 +365,16 @@ export function drawCombat(combat, canvas) {
         ctx.strokeRect(t.x * ts + 2, t.y * ts + 2, ts - 4, ts - 4);
       }
     }
+  }
+
+  // pause banner on top of everything
+  if (combat.paused) {
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(0, h * ts - 46, w * ts, 46);
+    ctx.fillStyle = "#ffd27a";
+    ctx.font = "bold 20px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PAUSED — give orders, then resume", (w * ts) / 2, h * ts - 23);
   }
 }

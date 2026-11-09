@@ -2,7 +2,7 @@
 //  Rage of the Mage — UI / screen rendering
 // ============================================================
 import { CLASSES, ALLIES, QUESTS, ENDINGS, SPELLS, GAME } from "./data.js";
-import { gameState, characterToUnit, createAllyUnit, applyXp, startCombat, resolveAttack, manhattan, currentUnit } from "./state.js";
+import { gameState, characterToUnit, createAllyUnit, applyXp, startCombat, manhattan } from "./state.js";
 import { startPassage, renderPassage, chooseChoice, resumeAfterCombatVictory } from "./story.js";
 import { drawCombat, tryPlayerAction, combatSay, selectUnit, CLASS_ICON, getCooldown, getSpellCooldown, autoCombat } from "./combat.js";
 
@@ -19,65 +19,123 @@ export function showScreen(name) {
 // ---------------------------------------------------------------
 //  Screen: Combat
 // ---------------------------------------------------------------
-export function renderCombat() {
-  const combat = gameState.combat;
+function combatCanvasEl() {
+  return document.getElementById("combat-canvas");
+}
+
+function renderCombatHeader(combat) {
   const nameEl = document.getElementById("combat-encounter-name");
   const phaseEl = document.getElementById("combat-phase");
   const logEl = document.getElementById("combat-log");
-  const unitsEl = document.getElementById("combat-units");
-  const actionsEl = document.getElementById("combat-actions");
-  const canvas = document.getElementById("combat-canvas");
-  if (!combat) return;
   if (nameEl) nameEl.textContent = combat.name;
-  const cur = currentUnit(combat);
-  if (phaseEl) phaseEl.textContent = combat.phase === "over"
-    ? (combat.result === "victory" ? "Victory" : "Defeat")
-    : `Your move — ${cur ? cur.name : ""}`;
-  if (logEl) logEl.innerHTML = combat.log.map((l) => `<div>${l}</div>`).join("");
-  if (unitsEl) {
-    let html = "";
-    for (const u of combat.units) {
-      if (!u.alive) continue;
-      const icon = u.side === "player" ? (CLASS_ICON[u.cls] || "⚔️") : "💀";
-      const sideLabel = u.side === "player" ? "Hero" : "Enemy";
-      const bossTag = u.isBoss ? " ★ BOSS" : "";
-      html += `<div class="list-item"><span class="name">${icon} ${u.name}${bossTag}</span><span class="meta">${sideLabel} · HP ${u.hp}/${u.maxHp}${u.mp ? ` · MP ${u.mp}/${u.maxMp}` : ""}${u.moves ? ` · Move ${u.moves}` : ""}</div>`;
-    }
-    unitsEl.innerHTML = html;
+  const hudBtn = document.getElementById("btn-combat-endturn");
+  if (hudBtn && combat.phase !== "over") hudBtn.textContent = combat.paused ? "▶ Resume" : "⏸ Pause";
+  const alive = combat.units.filter((u) => u.alive);
+  if (phaseEl) {
+    phaseEl.textContent = combat.phase === "over"
+      ? (combat.result === "victory" ? "Victory" : "Defeat")
+      : combat.paused
+        ? "Paused — give orders, then resume"
+        : `Battle raging — ${alive.filter((u) => u.side === "player").length} of yours, ${alive.filter((u) => u.side === "enemy").length} of theirs`;
   }
-  if (actionsEl) {
-    actionsEl.innerHTML = "";
-    const cur2 = combat.units.find((u) => u.uid === combat.selectedId);
-    if (combat.phase === "real-time" && cur2 && cur2.side === "player" && cur2.alive) {
-      const holder = document.createElement("div");
-      holder.className = "list-item";
-      holder.innerHTML = `<span class="name">${cur2.name}</span><span class="meta">HP ${cur2.hp}/${cur2.maxHp}${cur2.mp ? ` · MP ${cur2.mp}/${cur2.maxMp}` : ""}</span>`;
-      const spellsWrap = document.createElement("div");
-      spellsWrap.className = "row";
-      for (const sid of cur2.spells || []) {
-        const s = SPELLS[sid];
-        if (!s) continue;
-        const now = performance.now();
-        const onCd = now < getSpellCooldown(combat, cur2.uid, s.id);
-        const affordable = cur2.mp >= s.cost && !onCd;
-        const btn = document.createElement("button");
-        btn.className = "btn btn-small";
-        btn.type = "button";
-        btn.textContent = `Cast ${s.name} (${s.cost} MP)`;
-        btn.disabled = !affordable;
-        btn.addEventListener("click", () => castSpellAtSelected(combat, cur2, sid));
-        spellsWrap.appendChild(btn);
-      }
-      holder.appendChild(spellsWrap);
-      const pauseBtn = document.createElement("button");
-      pauseBtn.className = "btn btn-primary";
-      pauseBtn.type = "button";
-      pauseBtn.textContent = combat.paused ? "Resume" : "Pause";
-      pauseBtn.addEventListener("click", () => tryPlayerAction(combat, { type: "pause" }));
-      holder.appendChild(pauseBtn);
-      actionsEl.appendChild(holder);
-    }
+  if (logEl) {
+    const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 8;
+    logEl.innerHTML = combat.log.map((l) => `<div>${l}</div>`).join("");
+    if (atBottom) logEl.scrollTop = logEl.scrollHeight;
   }
+}
+
+function renderCombatUnits(combat) {
+  const unitsEl = document.getElementById("combat-units");
+  if (!unitsEl) return;
+  let html = "";
+  for (const u of combat.units) {
+    if (!u.alive) continue;
+    const icon = u.side === "player" ? (CLASS_ICON[u.cls] || "⚔️") : "💀";
+    const sideLabel = u.side === "player" ? "Hero" : "Enemy";
+    const bossTag = u.isBoss ? " ★ BOSS" : "";
+    html += `<div class="list-item"><span class="name">${icon} ${u.name}${bossTag}</span><span class="meta">${sideLabel} · HP ${u.hp}/${u.maxHp}${u.mp ? ` · MP ${u.mp}/${u.maxMp}` : ""}</span></div>`;
+  }
+  unitsEl.innerHTML = html;
+}
+
+let lastActionsSig = "";
+
+function renderCombatActions(combat, force) {
+  const actionsEl = document.getElementById("combat-actions");
+  if (!actionsEl) return;
+  const cur = combat.units.find((u) => u.uid === combat.selectedId && u.alive) || null;
+  const sig = [
+    combat.selectedId,
+    combat.paused,
+    combat.phase,
+    cur ? `${cur.uid}:${cur.hp}:${cur.mp}` : "-",
+    combat.units.filter((u) => u.alive).map((u) => `${u.uid}:${u.hp}:${u.mp}`).join(","),
+  ].join("|");
+  if (!force && sig === lastActionsSig) return;
+  lastActionsSig = sig;
+
+  actionsEl.innerHTML = "";
+  const holder = document.createElement("div");
+  holder.className = "list-item";
+
+  if (cur) {
+    holder.innerHTML = `<span class="name">${CLASS_ICON[cur.cls] || "⚔️"} ${cur.name}</span><span class="meta">HP ${cur.hp}/${cur.maxHp}${cur.mp ? ` · MP ${cur.mp}/${cur.maxMp}` : ""}</span>`;
+    const spellsWrap = document.createElement("div");
+    spellsWrap.className = "row";
+    for (const sid of cur.spells || []) {
+      const s = SPELLS[sid];
+      if (!s) continue;
+      const now = performance.now();
+      const onCd = now < getSpellCooldown(combat, cur.uid, s.id);
+      const btn = document.createElement("button");
+      btn.className = "btn btn-small";
+      btn.type = "button";
+      btn.textContent = onCd ? `${s.name} (recovering)` : `Cast ${s.name} (${s.cost} MP)`;
+      btn.disabled = cur.mp < s.cost || onCd;
+      btn.addEventListener("click", () => {
+        const ok = castSpellAtSelected(combat, cur, sid);
+        renderCombat();
+        if (!ok) combatSay(combat, `${cur.name} cannot cast ${s.name} yet.`);
+      });
+      spellsWrap.appendChild(btn);
+    }
+    holder.appendChild(spellsWrap);
+  } else {
+    holder.innerHTML = `<span class="name">No hero selected</span><span class="meta">Click one of your tokens on the battlefield</span>`;
+  }
+
+  const pauseBtn = document.createElement("button");
+  pauseBtn.id = "btn-combat-pause";
+  pauseBtn.className = "btn btn-primary";
+  pauseBtn.type = "button";
+  pauseBtn.textContent = combat.paused ? "▶ Resume" : "⏸ Pause";
+  pauseBtn.addEventListener("click", () => {
+    tryPlayerAction(combat, { type: "pause" });
+    renderCombat();
+  });
+  holder.appendChild(pauseBtn);
+
+  actionsEl.appendChild(holder);
+}
+
+export function renderCombat() {
+  const combat = gameState.combat;
+  if (!combat) return;
+  renderCombatHeader(combat);
+  renderCombatUnits(combat);
+  renderCombatActions(combat, true);
+  const canvas = combatCanvasEl();
+  if (canvas) drawCombat(combat, canvas);
+}
+
+export function renderCombatLive() {
+  const combat = gameState.combat;
+  if (!combat) return;
+  renderCombatHeader(combat);
+  renderCombatUnits(combat);
+  renderCombatActions(combat, false);
+  const canvas = combatCanvasEl();
   if (canvas) drawCombat(combat, canvas);
 }
 
@@ -90,69 +148,85 @@ export function castSpellAtSelected(combat, unit, spellId) {
   if (!cur || cur.uid !== unit.uid) return false;
   const spell = SPELLS[spellId];
   if (!spell) return false;
-  const enemies = combat.units.filter((u) => u.side === "enemy" && u.alive);
-  if (!enemies.length) return false;
-  let target = null;
-  let best = Infinity;
-  for (const e of enemies) {
-    const d = manhattan(unit, e);
-    if (d < best) { best = d; target = e; }
-  }
-  if (!target) return false;
-  if (spell.type === "heal") {
-    const allies = combat.units.filter((u) => u.side === "player" && u.alive);
-    let allyTarget = null; let bestA = Infinity;
-    for (const a of allies) { const d = manhattan(unit, a); if (d < bestA) { bestA = d; allyTarget = a; } }
-    if (allyTarget && allyTarget.hp > 0 && allyTarget.hp < allyTarget.maxHp) {
-      allyTarget.hp += spell.power;
-      combat.log.push(`${unit.name} casts ${spell.name} on ${allyTarget.name} for ${spell.power}.`);
-      return true;
+  let targetUid = null;
+  if (spell.type === "damage") {
+    let target = null;
+    let best = Infinity;
+    for (const e of combat.units.filter((u) => u.side === "enemy" && u.alive)) {
+      const d = manhattan(unit, e);
+      if (d < best) { best = d; target = e; }
     }
-    return false;
+    if (!target) return false;
+    targetUid = target.uid;
   }
-  if (manhattan(unit, target) < 1) { combat.log.push(`${unit.name} is too close to cast ${spell.name}.`); return false; }
-  if (manhattan(unit, target) > spell.range) { combat.log.push(`${unit.name} cannot reach ${spell.name}.`); return false; }
-  if (unit.mp < spell.cost) { combat.log.push(`${unit.name} lacks mana for ${spell.name}.`); return false; }
-  unit.mp -= spell.cost;
-  const res = resolveAttack(combat, unit, target, spell);
-  combat.log.push(`${unit.name} casts ${spell.name} on ${target.name} for ${res.dmg}.`);
-  if (target.hp <= 0) target.alive = false;
-  return true;
+  const res = tryPlayerAction(combat, { type: "cast", spellId, targetUid });
+  return res.ok;
 }
 
 export function endTurnCombat() {
   const combat = gameState.combat;
   if (!combat) return;
-  tryPlayerAction(combat, { type: "pause" });
+  if (combat.phase !== "over") tryPlayerAction(combat, { type: "pause" });
+  const hudBtn = document.getElementById("btn-combat-endturn");
+  if (hudBtn) hudBtn.textContent = combat.paused ? "▶ Resume" : "⏸ Pause";
   renderCombat();
   if (combat.phase === "over") {
-    stopCombatLoop();
-    if (combat.result === "victory") {
-      gameState.ending = ENDINGS["the-sleeper"];
-      resumeAfterCombatVictory();
-      renderStory();
-      showScreen("story");
-    } else if (combat.result === "defeat") {
-      gameState.ending = ENDINGS["the-black-legion"];
-      showScreen("end");
-    }
+    finishCombat(combat);
   }
 }
 
 let combatRaf = null;
 let lastTime = 0;
+let lastPanel = 0;
+let combatOverHandled = null;
+
+export function finishCombat(combat) {
+  if (!combat || combatOverHandled === combat) return;
+  combatOverHandled = combat;
+  renderCombat();
+  if (combat.result === "victory") {
+    if (gameState.character && combat.xpReward) applyXp(gameState.character, combat.xpReward);
+    resumeAfterCombatVictory();
+    renderStory();
+    showScreen("story");
+  } else {
+    gameState.ending = ENDINGS["the-black-legion"];
+    renderEnd();
+    showScreen("end");
+  }
+}
 
 export function startCombatLoop() {
+  stopCombatLoop();
+  combatOverHandled = null;
+  lastActionsSig = "";
   lastTime = performance.now();
+  lastPanel = 0;
+
   function frame(now) {
-    if (!gameState.combat || gameState.combat.phase === "over") {
+    const combat = gameState.combat;
+    if (!combat) { combatRaf = null; return; }
+
+    const dt = Math.min(100, now - lastTime);
+    lastTime = now;
+
+    if (combat.phase !== "over") autoCombat(combat, dt);
+
+    if (combat.phase === "over") {
       combatRaf = null;
+      finishCombat(combat);
       return;
     }
-    const dt = now - lastTime;
-    lastTime = now;
-    autoCombat(gameState.combat, dt);
-    renderCombat();
+
+    // canvas animates every frame; the DOM panels only refresh a few times a second
+    const canvas = combatCanvasEl();
+    if (canvas) drawCombat(combat, canvas);
+    if (now - lastPanel > 250) {
+      lastPanel = now;
+      renderCombatHeader(combat);
+      renderCombatUnits(combat);
+      renderCombatActions(combat, false);
+    }
     combatRaf = requestAnimationFrame(frame);
   }
   combatRaf = requestAnimationFrame(frame);
@@ -177,6 +251,7 @@ export function renderEnd() {
     if (titleEl) titleEl.textContent = "The End";
     if (textEl) textEl.innerHTML = "<p>You have no memory of this.</p>";
     if (btnsEl) btnsEl.innerHTML = `<button class="btn btn-primary" id="btn-end-new">New Journey</button>`;
+    bind("end-new", newJourney);
     return;
   }
   if (endEl) endEl.textContent = e.kicker;
@@ -254,13 +329,13 @@ export function renderHow() {
     <div class="panel">
       <h2>How to Play</h2>
       <p>You are the hero of the age. Choose <b>Warrior</b> (sword &amp; bow, rage) or <b>Mage</b> (staff &amp; sorcery — the Will and the Word).</p>
-      <p>Walk the story. Make choices. Fight the <b>Black Legions</b> in tactical battles.</p>
+      <p>Walk the story. Make choices. Fight the <b>Black Legions</b> in real-time battles.</p>
       <ul>
-        <li>Move with click-to-move (highlight shows reachable tiles).</li>
-        <li>Click an enemy to strike or cast.</li>
-        <li>Wizards cast spells spending Mana; warriors strike or use <em>Power Strike</em>.</li>
-        <li>Press <b>End Turn</b> when ready.</li>
-        <li>Recruit companions through the story; your party holds three heroes.</li>
+        <li>The battle flows on its own — your heroes and the dead close in and trade blows.</li>
+        <li><b>Pause</b> to give orders: click one of your tokens to select it, click empty ground to move it, click an enemy to strike.</li>
+        <li>Spells cost Mana and need time to recover; watch the red ring when a hero is mid-swing.</li>
+        <li>Recruit companions through the story; your party grows as the tale unfolds.</li>
+        <li>You win when the last enemy falls — and the story carries on.</li>
       </ul>
       <button class="btn btn-primary" id="btn-how-back">Back</button>
     </div>
@@ -279,34 +354,82 @@ export function onCombatCanvasClick(e) {
   const rect = canvas.getBoundingClientRect();
   const x = Math.floor(((e.clientX - rect.left) / rect.width) * combat.terrain.w);
   const y = Math.floor(((e.clientY - rect.top) / rect.height) * combat.terrain.h);
+  if (x < 0 || y < 0 || x >= combat.terrain.w || y >= combat.terrain.h) return;
+
   const enemy = combat.units.find((u) => u.alive && u.side === "enemy" && u.x === x && u.y === y) || null;
   const own = combat.units.find((u) => u.alive && u.side === "player" && u.x === x && u.y === y) || null;
-  if (enemy) {
-    const res = tryPlayerAction(combat, { type: "attack", targetUid: enemy.uid });
-    renderCombat();
-    return;
-  }
+
   if (own) {
     selectUnit(combat, own.uid);
     renderCombat();
     return;
   }
+
+  if (enemy) {
+    // the selected hero acts; if nobody is selected, the nearest hero steps up
+    let actor = combat.units.find((u) => u.uid === combat.selectedId && u.alive && u.side === "player") || null;
+    if (!actor) {
+      actor = nearestTo(combat, enemy, "player");
+      if (actor) selectUnit(combat, actor.uid);
+    }
+    if (!actor) { renderCombat(); return; }
+
+    let res = tryPlayerAction(combat, { type: "attack", targetUid: enemy.uid });
+    if (!res.ok) {
+      const dmgSpell = (actor.spells || [])
+        .map((sid) => SPELLS[sid])
+        .filter((s) => s && s.type === "damage" && actor.mp >= s.cost)
+        .sort((a, b) => (b.power || 0) - (a.power || 0))[0];
+      if (dmgSpell) res = tryPlayerAction(combat, { type: "cast", spellId: dmgSpell.id, targetUid: enemy.uid });
+    }
+    if (!res.ok) {
+      const why = res.reason === "cooldown" ? "still recovering"
+        : res.reason === "out-of-range" ? "out of range — move closer first"
+        : "cannot act right now";
+      combatSay(combat, `${actor.name}: ${why}.`);
+    }
+    renderCombat();
+    return;
+  }
+
+  // empty ground: move the selected hero there
   if (combat.selectedId) {
-    const u = combat.units.find((x2) => x2.uid === combat.selectedId);
+    const u = combat.units.find((u2) => u2.uid === combat.selectedId);
     if (u && u.alive) {
-      u.x = x; u.y = y;
+      u.x = x;
+      u.y = y;
+      u.face = 1;
       combat.movable = [];
-      combat.selectedId = null;
       renderCombat();
     }
     return;
   }
+
+  const hero = nearestTo(combat, { x, y }, "player");
+  if (hero) {
+    selectUnit(combat, hero.uid);
+    renderCombat();
+  }
+}
+
+function nearestTo(combat, point, side) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const u of combat.units) {
+    if (!u.alive || u.side !== side) continue;
+    const d = manhattan(point, u);
+    if (d < bestDist) { bestDist = d; best = u; }
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------
 //  Actions
 // ---------------------------------------------------------------
 export function newJourney() {
+  stopCombatLoop();
+  combatOverHandled = null;
+  lastActionsSig = "";
   gameState.character = null;
   gameState.allies = [];
   gameState.passageId = "the-orb-stolen";

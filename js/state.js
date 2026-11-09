@@ -176,7 +176,7 @@ export function manhattan(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.
 export function resolveAttack(combat, attacker, defender, spell) {
   let dmg, kind;
   if (spell) {
-    dmg = attacker.magic + (spell.power || 0) - defender.def - (defender.magicDef || 0);
+    dmg = Math.round(attacker.magic * 0.6) + (spell.power || 0) - defender.def - (defender.magicDef || 0);
     kind = `spell:${spell.id}`;
   } else {
     dmg = attacker.atk + (attacker.weaponBonus || 0) - defender.def;
@@ -187,7 +187,12 @@ export function resolveAttack(combat, attacker, defender, spell) {
   if (crit) dmg = Math.round(dmg * 1.5);
   dmg = Math.max(1, dmg);
   defender.hp = Math.max(0, defender.hp - dmg);
-  combat.log.push(`${attacker.name} ${kind === "strike" ? "strikes" : "casts"} ${defender.name} for ${dmg}${crit ? " (CRIT!)" : ""}.`);
+  combat.log.push(
+    spell
+      ? `${attacker.name} casts ${spell.name} at ${defender.name} for ${dmg}${crit ? " (CRIT!)" : ""}.`
+      : `${attacker.name} strikes ${defender.name} for ${dmg}${crit ? " (CRIT!)" : ""}.`
+  );
+  if (combat.log.length > 80) combat.log.shift();
   if (defender.hp <= 0) defender.alive = false;
   return { dmg, kind, crit };
 }
