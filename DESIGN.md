@@ -37,9 +37,11 @@ gathered a fellowship of heroes. You are the hero of the hour: you choose the **
 Belgarath, Polgara, Durnik, Silk, Barak — the fellowship. Player recruits companions through story choices.
 Party capacity: player + 2 allies.
 
-## 5. Combat design (tactical, turn-based, grid)
+## 5. Combat design (real-time with pause, grid battlefield)
 
-- Grid battlefield, initiative order, movement points, melee/ranged, spells, mana, crits.
+- Real-time-with-pause: heroes and the dead advance, strike and cast on cooldowns; pause any moment to issue orders.
+- Unhurried pace — 2.0 s hero attacks, 2.4 s for the slower dead, 3.2 s spell recovery, 0.6 s movement steps, 2.6 s opening grace before engagement.
+- Animated pixel-art sprites (walk cycle, attack lunge, hit flash, death fade), shadows, painter's-order row sorting.
 - Undead AI: advance + attack; necromancer: cast Flame.
 - Win: clear the Black Legions. Lose: the fellowship falls.
 

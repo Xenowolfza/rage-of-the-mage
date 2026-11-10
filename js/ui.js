@@ -396,9 +396,9 @@ export function onCombatCanvasClick(e) {
   if (combat.selectedId) {
     const u = combat.units.find((u2) => u2.uid === combat.selectedId);
     if (u && u.alive) {
+      if (x !== u.x) u.face = Math.sign(x - u.x);
       u.x = x;
       u.y = y;
-      u.face = 1;
       combat.movable = [];
       renderCombat();
     }

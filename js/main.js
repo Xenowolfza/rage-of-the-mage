@@ -4,6 +4,7 @@
 import { gameState, createCharacter } from "./state.js";
 import { showScreen, renderCombat, renderStory, renderEnd, renderCompanions, renderQuests, renderStats, renderHow, onCombatCanvasClick, endTurnCombat, newJourney, startCombatLoop, stopCombatLoop, finishCombat } from "./ui.js";
 import { autoCombat } from "./combat.js";
+import { preloadSprites } from "./sprites.js";
 import { startPassage } from "./story.js";
 
 function bind(id, handler) {
@@ -26,6 +27,8 @@ function bindCreateScreen() {
 }
 
 function boot() {
+  preloadSprites();
+
   // Title screen buttons (exist in initial HTML)
   bind("btn-new-journey", () => { selectedClass = null; updateClassSelection(); showScreen("create"); bindCreateScreen(); });
   bind("btn-back-title", () => showScreen("title"));

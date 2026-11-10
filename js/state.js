@@ -187,6 +187,14 @@ export function resolveAttack(combat, attacker, defender, spell) {
   if (crit) dmg = Math.round(dmg * 1.5);
   dmg = Math.max(1, dmg);
   defender.hp = Math.max(0, defender.hp - dmg);
+
+  // animation cues for the sprite renderer
+  const now = performance.now();
+  attacker.attackAt = now;
+  if (defender.x !== attacker.x) attacker.face = Math.sign(defender.x - attacker.x);
+  defender.hitAt = now;
+  if (defender.hp <= 0 && defender.alive) defender.diedAt = now;
+
   combat.log.push(
     spell
       ? `${attacker.name} casts ${spell.name} at ${defender.name} for ${dmg}${crit ? " (CRIT!)" : ""}.`
