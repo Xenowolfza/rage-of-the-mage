@@ -156,14 +156,34 @@ export const ENEMIES = {
     hp: 26, maxHp: 26, atk: 5, def: 1, magic: 0, magicDef: 0, moves: 2,
     spells: [], weaponBonus: 0, desc: "The dead that hungered too long.",
   },
+  ghoul: {
+    id: "ghoul", name: "Ghoul", kind: "undead", isBoss: false,
+    hp: 22, maxHp: 22, atk: 5, def: 1, magic: 0, magicDef: 0, moves: 3,
+    spells: [], weaponBonus: 1, desc: "A pale runner of the fens. Quick and hungry.",
+  },
+  wraith: {
+    id: "wraith", name: "Wraith", kind: "undead", isBoss: false,
+    hp: 24, maxHp: 24, atk: 3, def: 2, magic: 8, magicDef: 5, moves: 3,
+    spells: ["will-bolt"], weaponBonus: 0, desc: "A shadow that remembers being a man.",
+  },
   wight: {
     id: "wight", name: "Wight", kind: "undead", isBoss: false,
     hp: 32, maxHp: 32, atk: 7, def: 3, magic: 0, magicDef: 0, moves: 2,
     spells: [], weaponBonus: 1, desc: "A chieftain of the dead.",
   },
+  karand: {
+    id: "karand", name: "Karand Zombie", kind: "undead", isBoss: false,
+    hp: 42, maxHp: 42, atk: 6, def: 4, magic: 0, magicDef: 2, moves: 2,
+    spells: [], weaponBonus: 2, desc: "The dead who walk in armour out of Karanda.",
+  },
+  witch: {
+    id: "witch", name: "Fen Witch", kind: "witch", isBoss: true,
+    hp: 56, maxHp: 56, atk: 4, def: 3, magic: 12, magicDef: 6, moves: 2,
+    spells: ["flame", "will-bolt"], weaponBonus: 0, desc: "The Witch of the Fens. Old trade, older prices.",
+  },
   necromancer: {
     id: "necromancer", name: "Necromancer", kind: "undead", isBoss: true,
-    hp: 60, maxHp: 60, atk: 4, def: 2, magic: 10, magicDef: 3, moves: 2,
+    hp: 64, maxHp: 64, atk: 4, def: 3, magic: 11, magicDef: 4, moves: 2,
     spells: ["flame", "will-bolt"], weaponBonus: 0, desc: "Wielder of the dark art. The shadow behind the horde.",
   },
 };
@@ -180,21 +200,45 @@ export const ENCOUNTERS = {
     enemyIds: ["skeleton", "zombie"],
     xpReward: 20,
   },
+  "the-ambush": {
+    id: "the-ambush",
+    name: "Night of Wolves",
+    tagline: "Out of the dark, on two legs.",
+    terrain: { w: 12, h: 8 },
+    enemyIds: ["ghoul", "ghoul", "skeleton", "wraith"],
+    xpReward: 30,
+  },
   "the-fens": {
     id: "the-fens",
     name: "The Fens of Vordai",
     tagline: "The dead do not forgive the living who sleep.",
     terrain: { w: 12, h: 8 },
-    enemyIds: ["skeleton", "zombie", "wight"],
+    enemyIds: ["skeleton", "zombie", "wight", "wraith"],
     xpReward: 35,
+  },
+  "the-witch-hut": {
+    id: "the-witch-hut",
+    name: "The Witch's Hut",
+    tagline: "Old trade. Older prices.",
+    terrain: { w: 12, h: 8 },
+    enemyIds: ["witch", "wraith", "ghoul"],
+    xpReward: 45,
+  },
+  "the-bridge": {
+    id: "the-bridge",
+    name: "The Old Stone Bridge",
+    tagline: "The only crossing for a hundred miles.",
+    terrain: { w: 14, h: 8 },
+    enemyIds: ["karand", "karand", "wraith", "ghoul"],
+    xpReward: 45,
   },
   "black-legions": {
     id: "black-legions",
     name: "The Black Legions",
     tagline: "When the dead march, only the living can answer.",
     terrain: { w: 14, h: 8 },
-    enemyIds: ["zombie", "skeleton", "wight", "necromancer"],
-    xpReward: 60,
+    enemyIds: ["zombie", "skeleton", "wight", "ghoul", "necromancer"],
+    xpReward: 70,
   },
 };
 
@@ -238,8 +282,8 @@ export const PASSAGES = {
       "The Old Wolf spoke of Silk the scout, of Durnik the blacksmith, of Polgara the sorceress, of Barak the warrior. Each carried old debts from the last war with the dead.",
     ],
     choices: [
-      { text: "Silk will ride with you.", next: "the-fellowship-2", effect: { recruit: "silk" } },
-      { text: "Durnik will ride with you.", next: "the-fellowship-2", effect: { recruit: "durnik" } },
+      { text: "Silk will ride with you.", next: "the-fellowship-2", effect: { recruit: "silk", questStage: "The Fellowship" } },
+      { text: "Durnik will ride with you.", next: "the-fellowship-2", effect: { recruit: "durnik", questStage: "The Fellowship" } },
     ],
   },
   "the-fellowship-2": {
@@ -251,8 +295,47 @@ export const PASSAGES = {
       "You chose your first companion. Now the second.",
     ],
     choices: [
-      { text: "Polgara will lend her sorcery.", next: "the-fens", effect: { recruit: "polgara" } },
-      { text: "Barak will lend his axe.", next: "the-fens", effect: { recruit: "barak" } },
+      { text: "Polgara will lend her sorcery.", next: "the-road", effect: { recruit: "polgara" } },
+      { text: "Barak will lend his axe.", next: "the-road", effect: { recruit: "barak" } },
+    ],
+  },
+  "the-road": {
+    id: "the-road",
+    kicker: "Act II — The Long Road",
+    title: "The Long Road",
+    paragraphs: [
+      "The road east was empty the way roads are only empty before a war — everyone with sense had already hidden.",
+      "Milestones stood with their names chiselled off, so the dead could not read where they were going.",
+      "Night fell faster than the road allowed. The fellowship had a choice to make.",
+    ],
+    choices: [
+      { text: "Make camp at the roadside inn.", next: "the-ambush", effect: { questStage: "The Long Road" } },
+      { text: "Push on through the dark.", next: "the-ambush", effect: { questStage: "The Long Road" } },
+    ],
+  },
+  "the-ambush": {
+    id: "the-ambush",
+    kicker: "Act II — Night of Wolves",
+    title: "Night of Wolves",
+    paragraphs: [
+      "They came out of the dark on two legs — pale runners of the fens, and a shadow that remembered being a man.",
+      "“Ghouls,” Belgarath said, and reached for the Will. “And worse.”",
+    ],
+    choices: [
+      { text: "Hold the firelight and fight.", next: "the-campfires", effect: { combat: "the-ambush" } },
+    ],
+  },
+  "the-campfires": {
+    id: "the-campfires",
+    kicker: "Act II — Campfires",
+    title: "Campfires",
+    paragraphs: [
+      "When the last ghoul fell, the night went quiet, and Belgarath sat down on a stone like a very old man who had earned the right.",
+      "“One more walker joins, or one more gift is given,” he said. “Choose, and be careful about it.”",
+    ],
+    choices: [
+      { text: "Belgarath will ride with you.", next: "the-fens", effect: { recruit: "belgarath" } },
+      { text: "Take the Old Wolf's blessing for yourself.", next: "the-fens", effect: { bless: true } },
     ],
   },
   "the-fens": {
@@ -264,19 +347,46 @@ export const PASSAGES = {
       "The fellowship made camp by the black waters. And the dead found them.",
     ],
     choices: [
-      { text: "Meet the Black Legions in the fens.", next: "the-black-legions", effect: { combat: "the-fens" } },
+      { text: "Meet the Black Legions in the fens.", next: "the-witch-hut", effect: { combat: "the-fens", questStage: "The Fens of Vordai" } },
+    ],
+  },
+  "the-witch-hut": {
+    id: "the-witch-hut",
+    kicker: "Act III — The Witch of the Fens",
+    title: "The Witch's Hut",
+    paragraphs: [
+      "Past the drowned trees stood a hut on bird-legs, and in its doorway a bent figure with a staff of root and bone.",
+      "“You carry will,” the Witch of the Fens said. “My kind carried it before Aldur ever spoke. Let us weigh whose is heavier.”",
+      "Beside her, shapes peeled away from the mud — shadows with faces, and a pale runner smiling.",
+    ],
+    choices: [
+      { text: "Draw steel. The dead stay dead.", next: "the-bridge", effect: { combat: "the-witch-hut", questStage: "The Witch of the Fens" } },
+      { text: "Answer her riddle with the Will.", next: "the-bridge", effect: { combat: "the-witch-hut", questStage: "The Witch of the Fens" } },
+    ],
+  },
+  "the-bridge": {
+    id: "the-bridge",
+    kicker: "Act III — The Old Stone Bridge",
+    title: "The Old Stone Bridge",
+    paragraphs: [
+      "The bridge was older than the kingdoms, and it was the only crossing for a hundred miles in any direction.",
+      "On the far side, armoured dead out of Karanda waited with the patience of things that never tire.",
+      "“We cross,” Belgarath said, “or we spend the war on the wrong bank.”",
+    ],
+    choices: [
+      { text: "Take the crossing.", next: "the-black-legions", effect: { combat: "the-bridge" } },
     ],
   },
   "the-black-legions": {
     id: "the-black-legions",
-    kicker: "Act III — The Black Legions",
+    kicker: "Act IV — The Black Legions",
     title: "The Black Legions",
     paragraphs: [
       "The dead marched on the last free ground. Belgarath did not pray. He reached for the Will and the Word, and the fellowship answered.",
-      "Three of you stood against the horde — and the shadow behind it.",
+      "The living stood against the horde — and the shadow behind it.",
     ],
     choices: [
-      { text: "Rally the living and strike the Black Legions.", next: "the-ending", effect: { combat: "black-legions" } },
+      { text: "Rally the living and strike the Black Legions.", next: "the-ending", effect: { combat: "black-legions", questStage: "The End" } },
     ],
   },
   "the-ending": {
@@ -339,7 +449,7 @@ export const QUESTS = [
   {
     id: "war-of-the-sleeping-god",
     name: "The War of the Sleeping God",
-    stages: ["The Theft", "The Fellowship", "The Black Legions", "The End"],
+    stages: ["The Theft", "The Fellowship", "The Long Road", "The Fens of Vordai", "The Witch of the Fens", "The Black Legions", "The End"],
     stageIndex: 0,
   },
 ];

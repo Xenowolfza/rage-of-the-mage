@@ -337,6 +337,153 @@ def necromancer(s, f):
     s.set(29, 4 + bob, "glow")
 
 
+def ghoul(s, f):
+    bob, stride, arm = framing(f)
+    # hunched: everything leans right, head low and forward
+    skin, skin_d = "zombie", shade("zombie_d", 0.85)
+    # legs (long, bent)
+    lx = 13 + stride
+    rx = 18 - stride
+    s.rect(lx, 24 + bob, lx + 2, 31 + bob, "leather_d")
+    s.rect(rx, 24 + bob, rx + 2, 31 + bob, "leather_d")
+    s.rect(lx - 1, 30 + bob, lx + 2, 31 + bob, skin)
+    s.rect(rx, 30 + bob, rx + 2, 31 + bob, skin)
+    # ragged loincloth / torn body
+    s.rect(12, 15 + bob, 20, 23 + bob, skin)
+    s.rect(13, 19 + bob, 19, 22 + bob, "leather_d")
+    for x, y in ((14, 16), (18, 18), (13, 21), (19, 20)):
+        s.set(x, y + bob, skin_d)
+    # ribs showing through
+    for y in (17, 19):
+        s.set(15, y + bob, "bone_d")
+        s.set(17, y + bob, "bone_d")
+    # arms reaching forward with claws
+    s.rect(20, 14 + bob, 28, 16 + bob, skin)
+    s.rect(27, 13 + bob, 29, 16 + bob, skin)
+    for x in (28, 29, 30):
+        s.set(x, 13 + bob, "bone")
+        s.set(x, 16 + bob, "bone")
+    s.rect(19, 17 + bob + arm, 26, 19 + bob + arm, skin)
+    for x in (26, 27):
+        s.set(x, 18 + bob + arm, "bone")
+    # head, low and forward
+    s.rect(16, 6 + bob, 23, 12 + bob, skin)
+    s.rect(17, 11 + bob, 22, 13 + bob, skin_d)
+    s.rect(16, 4 + bob, 21, 6 + bob, "leather_d")   # stringy hair
+    s.set(19, 8 + bob, "red")                       # hungry eyes
+    s.set(22, 8 + bob, "red")
+    s.set(20, 12 + bob, "dark")                     # mouth
+    s.set(21, 12 + bob, "bone")
+
+
+def wraith(s, f):
+    bob, stride, arm = framing(f)
+    bob -= [0, -1, -2, -1][f]  # floats on a slow wave
+    body = "dark"
+    rim = shade("blue_d", 1.15)
+    # hooded head
+    s.rect(11, 2 + bob, 21, 9 + bob, rim)
+    s.rect(12, 3 + bob, 20, 8 + bob, body)
+    s.rect(13, 4 + bob, 19, 8 + bob, shade("dark", 1.4))
+    s.set(14, 6 + bob, "cyan")
+    s.set(18, 6 + bob, "cyan")
+    s.set(14, 7 + bob, "cyan")
+    s.set(18, 7 + bob, "cyan")
+    # shoulders + tattered mantle
+    s.rect(9, 10 + bob, 23, 15 + bob, rim)
+    s.rect(10, 11 + bob, 22, 14 + bob, body)
+    # sleeves reaching
+    s.rect(22, 12 + bob, 27, 14 + bob, rim)
+    s.rect(23, 13 + bob, 26, 13 + bob, body)
+    s.set(27, 13 + bob, "cyan")
+    s.rect(5, 12 + bob, 9, 14 + bob, rim)
+    # body tapering to a wisp trail (no legs)
+    for i, y in enumerate(range(16, 31)):
+        half = max(1, 6 - i // 3)
+        s.rect(16 - half, y + bob, 15 + half, y + bob, body)
+        s.set(16 - half, y + bob, rim)
+        s.set(15 + half, y + bob, rim)
+    for x in (12, 15, 18, 20):
+        s.set(x, 30 + bob, "clear")
+    for x in (13, 19):
+        s.set(x, 29 + bob, "clear")
+
+
+def witch(s, f):
+    bob, stride, arm = framing(f)
+    robe = "green"
+    robe_d = "green_d"
+    # robe: bent, narrow, hem tattered
+    for i, y in enumerate(range(12, 31)):
+        half = 4 + i // 6
+        s.rect(16 - half, y + bob, 15 + half, y + bob, robe)
+        s.set(16 - half, y + bob, robe_d)
+        s.set(15 + half, y + bob, robe_d)
+    for x in (11, 14, 17, 20):
+        s.set(x, 30 + bob, "clear")
+    s.rect(11, 20 + bob, 21, 21 + bob, "leather_d")
+    s.set(16, 23 + bob, "yellow")   # charm
+    s.set(13, 25 + bob, "bone")
+    # hunched shoulders + hood
+    s.rect(10, 11 + bob, 22, 12 + bob, robe_d)
+    s.rect(12, 4 + bob, 22, 10 + bob, robe)
+    s.rect(12, 5 + bob, 20, 9 + bob, shade("dark", 1.3))
+    s.set(14, 7 + bob, "glow")      # green glow eyes
+    s.set(18, 7 + bob, "glow")
+    s.set(20, 8 + bob, "skin_d")    # long nose poking out of the shadow
+    # gnarled staff with a knotted head
+    s.rect(25, 7 + bob, 26, 30 + bob, "leather_d")
+    s.rect(24, 3 + bob, 27, 6 + bob, "leather")
+    s.set(23, 4 + bob, "leather_d")
+    s.set(27, 2 + bob, "glow")
+    s.set(28, 4 + bob, "bone")
+    s.set(27, 7 + bob, "gold")
+    # claw hand mid-staff
+    s.rect(23, 13 + bob, 25, 19 + bob, robe_d)
+    s.set(24, 20 + bob, "skin_d")
+    # other hand clutching a bundle of roots
+    s.rect(9, 14 + bob + arm, 12, 20 + bob + arm, robe_d)
+    s.rect(8, 18 + bob + arm, 11, 21 + bob + arm, "leather")
+
+
+def karand(s, f):
+    bob, stride, arm = framing(f)
+    bronze = "gold_d"
+    bronze_d = shade("gold_d", 0.72)
+    # heavy legs + boots
+    legs(s, 11, 18, 23, 31, bronze_d, "leather_d", stride, bob)
+    # bronze cuirass over rotting frame
+    s.rect(10, 12 + bob, 22, 23 + bob, bronze)
+    s.rect(10, 12 + bob, 22, 13 + bob, "gold")
+    s.rect(12, 15 + bob, 20, 21 + bob, bronze_d)
+    s.set(16, 17 + bob, "zombie")
+    s.set(15, 18 + bob, "zombie")
+    s.set(17, 19 + bob, "zombie_d")
+    s.rect(10, 22 + bob, 22, 23 + bob, "leather_d")
+    s.set(16, 22 + bob, "rust")
+    # pauldrons + helm with crest
+    s.rect(8, 11 + bob, 10, 14 + bob, "gold")
+    s.rect(22, 11 + bob, 24, 14 + bob, "gold")
+    s.rect(12, 3 + bob, 20, 10 + bob, bronze)
+    s.rect(13, 5 + bob, 19, 10 + bob, "zombie")
+    s.rect(12, 3 + bob, 20, 4 + bob, "rust")       # crest
+    s.rect(15, 2 + bob, 17, 3 + bob, "rust")
+    s.set(15, 7 + bob, "dark")
+    s.set(18, 7 + bob, "dark")
+    s.set(16, 10 + bob, "dark")
+    s.set(17, 10 + bob, "dark")
+    # shield arm
+    s.rect(5, 14 + bob + arm, 10, 25 + bob + arm, bronze)
+    s.rect(6, 15 + bob + arm, 9, 24 + bob + arm, bronze_d)
+    s.set(7, 19 + bob + arm, "rust")
+    # mace arm
+    s.rect(23, 14 + bob, 25, 21 + bob, bronze_d)
+    s.rect(25, 8 + bob, 27, 15 + bob, "leather_d")  # haft
+    s.rect(24, 5 + bob, 28, 8 + bob, "steel_d")     # head
+    s.set(25, 5 + bob, "steel_l")
+    s.set(28, 7 + bob, "steel_l")
+
+
 # ---------------------------------------------------------------- png writer
 def write_png(path, width, height, rows):
     raw = b"".join(b"\x00" + bytes(row) for row in rows)
@@ -388,7 +535,11 @@ UNITS = {
     "ranger": ranger,
     "skeleton": skeleton,
     "zombie": zombie,
+    "ghoul": ghoul,
+    "wraith": wraith,
     "wight": wight,
+    "karand": karand,
+    "witch": witch,
     "necromancer": necromancer,
 }
 
@@ -400,7 +551,7 @@ def main():
     for name, draw in UNITS.items():
         rows = sheet_rows(draw)
         write_png(os.path.join(OUT, f"{name}.png"), W * FRAMES, H, rows)
-        if name in ("warrior", "mage", "skeleton", "necromancer"):
+        if name in ("warrior", "mage", "ghoul", "wraith", "witch", "karand"):
             preview.extend(rows)
             preview.extend([list(blank), list(blank)])
     write_png(os.path.join(OUT, "_preview.png"), W * FRAMES, len(preview), preview)

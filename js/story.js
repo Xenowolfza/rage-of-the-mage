@@ -76,6 +76,14 @@ function applyEffect(effect, nextId) {
   if (effect.recruit) {
     if (!gameState.allies.includes(effect.recruit)) gameState.allies.push(effect.recruit);
   }
+  if (effect.bless && gameState.character) {
+    const hero = gameState.character;
+    hero.maxHp += 10;
+    hero.hp += 10;
+    hero.atk += 2;
+    hero.magic += 2;
+    gameState.flags["wolves-blessing"] = true;
+  }
   if (effect.xp) { if (gameState.character) applyXp(gameState.character, effect.xp); }
   if (effect.flag) gameState.flags[effect.flag.key] = effect.flag.value;
   if (effect.questStage) {

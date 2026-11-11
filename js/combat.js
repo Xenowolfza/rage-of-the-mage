@@ -15,12 +15,12 @@ const UNIT_COLOR = {
   boss: "#a8322a",
 };
 
-// Timing — deliberately unhurried, so orders and spells have room to breathe
-const ATTACK_DELAY = 2000;        // ms between hero auto-attacks
-const ENEMY_ATTACK_DELAY = 2400;  // the dead are slower still
-const SPELL_COOLDOWN = 3200;      // ms between spell casts
+// Timing — deliberately slow, so orders have time to matter
+const ATTACK_DELAY = 3200;        // ms between hero auto-attacks
+const ENEMY_ATTACK_DELAY = 4000;  // the dead are slower still
+const SPELL_COOLDOWN = 5200;      // ms between spell casts
 const MOVE_SPEED = 0.25;          // tiles per second (smooth movement)
-const OPENING_GRACE = 2600;       // ms of quiet before the armies engage
+const OPENING_GRACE = 3600;       // ms of quiet before the armies engage
 
 export function combatSay(combat, msg) {
   combat.log.push(msg);
@@ -155,7 +155,7 @@ export function tryPlayerAction(combat, action) {
   }
 }
 
-const MOVE_DELAY = 600; // ms between AI movement steps
+const MOVE_DELAY = 850; // ms between AI movement steps
 
 function nearestUnitFrom(u, list) {
   let best = null;
@@ -454,8 +454,8 @@ export function drawCombat(combat, canvas) {
     const dx = (u.x ?? u.ax) - u.ax;
     const dy = (u.y ?? u.ay) - u.ay;
     if (Math.abs(dx) > 0.2) u.face = Math.sign(dx);
-    u.ax += dx * 0.16;
-    u.ay += dy * 0.16;
+    u.ax += dx * 0.09;
+    u.ay += dy * 0.09;
     if (Math.abs(dx) < 0.01) u.ax = u.x;
     if (Math.abs(dy) < 0.01) u.ay = u.y;
 

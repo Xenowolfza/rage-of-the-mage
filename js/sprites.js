@@ -11,7 +11,11 @@ export const SPRITE_NAMES = [
   "ranger",
   "skeleton",
   "zombie",
+  "ghoul",
+  "wraith",
   "wight",
+  "karand",
+  "witch",
   "necromancer",
 ];
 
