@@ -2,8 +2,8 @@
 //  Rage of the Mage — game bootstrap
 // ============================================================
 import { gameState, createCharacter } from "./state.js";
-import { showScreen, renderCombat, renderStory, renderEnd, renderCompanions, renderQuests, renderStats, renderHow, onCombatCanvasClick, endTurnCombat, newJourney, startCombatLoop, stopCombatLoop, finishCombat } from "./ui.js";
-import { autoCombat } from "./combat.js";
+import { showScreen, renderCombat, renderStory, renderEnd, renderCompanions, renderQuests, renderStats, renderHow, onCombatCanvasClick, endTurnCombat, newJourney, startCombatLoop, stopCombatLoop, finishCombat, nudgeSelected, toggleDash, toggleHold, guardSelected, onCombatKey, performAttack, armSpell } from "./ui.js";
+import { autoCombat, tryPlayerAction, selectUnit, nudgeUnit } from "./combat.js";
 import { preloadSprites } from "./sprites.js";
 import { startPassage } from "./story.js";
 
@@ -45,11 +45,23 @@ function boot() {
   if (canvas) canvas.addEventListener("click", (e) => onCombatCanvasClick(e));
   bind("btn-combat-endturn", () => endTurnCombat());
 
+  // Movement pad and stance controls
+  bind("btn-move-up", () => nudgeSelected(0, -1));
+  bind("btn-move-down", () => nudgeSelected(0, 1));
+  bind("btn-move-left", () => nudgeSelected(-1, 0));
+  bind("btn-move-right", () => nudgeSelected(1, 0));
+  bind("btn-combat-dash", toggleDash);
+  bind("btn-combat-hold", toggleHold);
+  bind("btn-combat-guard", guardSelected);
+
+  // Hotkeys (only act on the combat screen)
+  document.addEventListener("keydown", onCombatKey);
+
   showScreen("title");
 }
 
 // Debug handle for testing from the console: __rage.gameState, __rage.autoCombat(...)
-window.__rage = { gameState, autoCombat, finishCombat, renderCombat };
+window.__rage = { gameState, autoCombat, finishCombat, renderCombat, tryPlayerAction, selectUnit, nudgeSelected, nudgeUnit, performAttack, armSpell, toggleDash, toggleHold, guardSelected, onCombatKey };
 
 function startGame() {
   const cls = gameState.cls || "warrior";

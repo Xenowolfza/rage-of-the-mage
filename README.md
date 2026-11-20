@@ -19,11 +19,31 @@ No build step, no dependencies. Vanilla ES modules + Canvas + CSS.
 ## Features
 
 - Story-first structure with RPG mechanics layered in — choices recruit allies and change the tale.
-- Two hero classes: **Warrior** (sword & bow, Power Strike) and **Mage** (Will Bolt, Flame of Aldur, Spirit Light).
+- Two hero classes: **Warrior** (sword & bow: Power Strike, Cleave, Aimed Shot) and **Mage** (Will Bolt, Flame of Aldur, Shield of the Will, Word of Unmaking, Spirit Light).
+- **Movement choices** — click-to-move within a hero's stride, WASD/arrow nudges, a **Dash** that covers twice the ground at the cost of a moment's guard, and **Hold** to keep a hero on their ground.
+- **Action choices** — Strike, Power Strike, Cleave (sweeps nearby foes), Aimed Shot, Guard (+3 DEF), and targeted spells: arm a spell, then click the foe or companion you mean to affect. Flame of Aldur splashes onto adjacent dead.
 - **Animated 2D pixel-art sprites** — characters walk, lunge when striking, flash when hit, and fade when they fall.
 - Real-time-with-pause tactical combat, tuned to an unhurried pace: units close in, trade blows, and recover from cooldowns; pause at any moment to issue orders.
 - Companions drawn from the Belgariad: Belgarath, Polgara, Durnik, Silk, Barak.
 - Magic follows Eddings lore: the Will and the Word, sorcery, witchcraft, demon magic, necromancy.
+
+## Controls
+
+| Input | Action |
+| --- | --- |
+| Click a hero / `1`–`4` / `Tab` | Select a hero |
+| Click ground | Move within the hero's stride (walks as far toward the spot as it can) |
+| `WASD` / arrow keys | Nudge the selected hero one tile |
+| `F` | Dash: the next move covers twice the ground, but the hero cannot attack for a moment |
+| `H` | Hold: the hero stops advancing and fights only what comes to them |
+| Click a foe | Strike (or auto-cast the best damage spell) |
+| `G` | Guard: +3 defense for five seconds |
+| `Q` / `E` / `R` / `T` | Arm a spell, then click a foe or companion to cast it |
+| `Space` | Pause / resume |
+| `Esc` | Cancel an armed spell and clear the selection |
+
+Warriors can use **Power Strike**, **Cleave**, and **Aimed Shot** from the action panel;
+the mage's **Shield of the Will** and **Spirit Light** are cast on companions.
 
 ## Sprites
 

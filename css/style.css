@@ -81,6 +81,8 @@ html, body {
 .btn-primary { background: #7a4a12; border-color: #a06a24; color: #ffe9c9; }
 .btn-primary:hover { background: #8f5a18; }
 .btn-small { padding: 6px 12px; font-size: 13px; }
+.btn.active { background: #4a3418; border-color: var(--accent); color: #ffe9c9; box-shadow: inset 0 0 12px rgba(201,138,45,0.35); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
 .class-card {
@@ -156,6 +158,21 @@ html, body {
 .combat-log { background: #14100b; border: 1px solid #000; border-radius: 8px; padding: 12px; font-size: 14px; min-height: 140px; max-height: 220px; overflow-y: auto; color: var(--parchment); font-family: Georgia, serif; }
 .combat-units { background: #14100b; border: 1px solid #000; border-radius: 8px; padding: 12px; font-size: 14px; color: var(--parchment); font-family: Georgia, serif; }
 .combat-actions { display: flex; flex-direction: column; gap: 8px; }
+.combat-controls { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.hero-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.hero-chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip-key { display: inline-block; min-width: 16px; text-align: center; border: 1px solid var(--panel-edge); border-radius: 4px; font-size: 11px; color: var(--accent); padding: 0 3px; }
+.chip-hp { font-size: 11px; color: #b9a88f; }
+.combat-control-row { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.dpad { display: grid; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(2, 32px); gap: 4px; }
+.dpad .btn { padding: 0; font-size: 13px; }
+.dpad-up { grid-column: 2; grid-row: 1; }
+.dpad-left { grid-column: 1; grid-row: 2; }
+.dpad-down { grid-column: 2; grid-row: 2; }
+.dpad-right { grid-column: 3; grid-row: 2; }
+.combat-modes { display: flex; gap: 8px; flex-wrap: wrap; }
+.combat-hint { margin: 0; font-size: 12px; color: #8d7c63; font-style: italic; }
+.combat-hint.armed { color: var(--accent); font-style: normal; margin-top: 8px; }
 
 /* ------------------------------- ENDS ------------------------------- */
 .end-panel { text-align: center; }

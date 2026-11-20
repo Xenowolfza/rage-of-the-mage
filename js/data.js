@@ -48,6 +48,29 @@ export const SPELLS = {
     target: "ally",
     desc: "Divine spirit light. Restores life to the fallen.",
   },
+  unmaking: {
+    id: "unmaking",
+    name: "Word of Unmaking",
+    school: "Sorcery",
+    cost: 5,
+    type: "damage",
+    power: 22,
+    range: 3,
+    target: "enemy",
+    desc: "Speak the Word and unmake what stands before you. Heavy cost, heavy blow.",
+  },
+  ward: {
+    id: "ward",
+    name: "Shield of the Will",
+    school: "Sorcery",
+    cost: 2,
+    type: "ward",
+    power: 4,
+    range: 3,
+    duration: 9000,
+    target: "ally",
+    desc: "A wall of will around an ally. +4 defense for a time.",
+  },
 };
 
 // ---------------------------------------------------------------
@@ -69,7 +92,7 @@ export const CLASSES = {
     bow: "Hunter's Bow",
     bowRange: 4,
     spells: [],
-    desc: "Sword and bow. High heart, steady blade. Wields the Rage — the Power Strike.",
+    desc: "Sword and bow. High heart, steady blade. Power Strike, Cleave and Aimed Shot.",
   },
   mage: {
     id: "mage",
@@ -83,8 +106,8 @@ export const CLASSES = {
     moves: 2,
     weapon: "Staff of Aldur",
     weaponBonus: 1,
-    spells: ["will-bolt", "flame"],
-    desc: "Staff and sorcery — the Will and the Word. Spells of will, flame and spirit.",
+    spells: ["will-bolt", "flame", "ward"],
+    desc: "Staff and sorcery — the Will and the Word. Spells of will, flame, spirit and warding.",
   },
 };
 

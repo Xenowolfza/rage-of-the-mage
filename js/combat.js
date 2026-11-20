@@ -22,6 +22,16 @@ const SPELL_COOLDOWN = 5200;      // ms between spell casts
 const MOVE_SPEED = 0.25;          // tiles per second (smooth movement)
 const OPENING_GRACE = 3600;       // ms of quiet before the armies engage
 
+// Special attacks and movement options
+const POWER_RECOVERY = 5200;      // heavy swing, slow to recover
+const CLEAVE_RECOVERY = 5000;     // sweeping strike
+const AIMED_RECOVERY = 4200;      // careful shot
+const GUARD_TIME = 5000;          // how long a braced hero keeps the bonus
+const GUARD_BONUS = 3;            // defense while braced
+const DASH_PENALTY = 1400;        // a dash leaves you open — no attacks during it
+const NUDGE_DELAY = 700;          // ms between keyboard movement steps
+const DASH_RANGE_MULT = 2;        // a dash covers twice the normal stride
+
 export function combatSay(combat, msg) {
   combat.log.push(msg);
   if (combat.log.length > 60) combat.log.shift();
@@ -97,54 +107,118 @@ export function tryPlayerAction(combat, action) {
   if (combat.phase === "over") return { ok: false, reason: "over" };
   const unit = combat.units.find((u) => u.uid === combat.selectedId);
   if (!unit || unit.side !== "player" || unit.alive === false) return { ok: false, reason: "no-selection" };
+  const now = performance.now();
   switch (action.type) {
     case "move": {
-      const m = combat.movable.find((t) => t.x === action.x && t.y === action.y);
-      if (!m) return { ok: false, reason: "not-reachable" };
-      unit.x = action.x; unit.y = action.y;
-      combat.movable = [];
-      combat.selectedId = null;
-      return { ok: true };
+      const dash = !!action.dash;
+      const range = dash ? unit.moves * DASH_RANGE_MULT : unit.moves;
+      const reachable = computeMovable(combat, unit, range);
+      let step = reachable.find((t) => t.x === action.x && t.y === action.y) || null;
+      let partial = false;
+      if (!step) {
+        // clicking beyond the stride: walk as far toward the spot as the stride allows
+        const goal = { x: action.x, y: action.y };
+        let best = null;
+        let bestScore = Infinity;
+        for (const t of reachable) {
+          const score = manhattan(t, goal) + t.dist * 0.01;
+          if (score < bestScore) { bestScore = score; best = t; }
+        }
+        step = best;
+        partial = !!step;
+      }
+      if (!step) return { ok: false, reason: "no-path" };
+      if (step.x !== unit.x) unit.face = Math.sign(step.x - unit.x);
+      unit.x = step.x;
+      unit.y = step.y;
+      if (dash) unit.dashUntil = now + DASH_PENALTY;
+      combat.movable = computeMovable(combat, unit);
+      if (partial) combatSay(combat, `${unit.name} advances as far as the ground allows.`);
+      return { ok: true, partial, dash };
     }
     case "attack": {
       const defender = combat.units.find((u) => u.uid === action.targetUid && u.alive && u.side === "enemy");
       if (!defender) return { ok: false, reason: "no-target" };
-      if (!canStrike(unit, defender) && !(unit.bow && manhattan(unit, defender) <= (unit.bowRange || 4)))
-        return { ok: false, reason: "out-of-range" };
-      const now = performance.now();
+      const mode = action.mode || "strike";
+      if (mode === "power" && !unit.canPower) return { ok: false, reason: "no-power" };
+      if (mode === "cleave" && !unit.canCleave) return { ok: false, reason: "no-cleave" };
+      if (mode === "aimed" && !unit.canAim) return { ok: false, reason: "no-bow" };
+      if (now < (unit.dashUntil || 0)) return { ok: false, reason: "dash-recovery" };
+      const dist = manhattan(unit, defender);
+      const reach = mode === "aimed"
+        ? (unit.bowRange || 4) + 1
+        : mode === "strike" && unit.bow
+          ? (unit.bowRange || 4)
+          : 1;
+      if (dist < 1 || dist > reach) return { ok: false, reason: "out-of-range" };
+      if (!unit.bow && (unit.cls === "mage" || unit.cls === "ranger")) return { ok: false, reason: "no-melee" };
       if (now < getCooldown(combat, unit.uid)) return { ok: false, reason: "cooldown" };
-      const res = resolveAttack(combat, unit, defender, null);
-      setCooldown(combat, unit.uid, ATTACK_DELAY);
+      resolveAttack(combat, unit, defender, null, mode);
+      setCooldown(combat, unit.uid,
+        mode === "power" ? POWER_RECOVERY
+          : mode === "cleave" ? CLEAVE_RECOVERY
+            : mode === "aimed" ? AIMED_RECOVERY
+              : ATTACK_DELAY);
       if (defender.hp <= 0) defender.alive = false;
-      return { ok: true };
+      return { ok: true, mode };
     }
     case "cast": {
       const defender = combat.units.find((u) => u.uid === action.targetUid && u.alive && u.side === "enemy");
       const spell = (unit.spells || []).map((sid) => SPELLS[sid]).find((s) => s && s.id === action.spellId) || null;
       if (!spell) return { ok: false, reason: "no-spell" };
-      if (spell.type === "damage" && (!defender || !canCast(unit, defender, spell)))
-        return { ok: false, reason: "out-of-range" };
-      const now = performance.now();
       if (now < getSpellCooldown(combat, unit.uid, spell.id)) return { ok: false, reason: "cooldown" };
       if (unit.mp < spell.cost) return { ok: false, reason: "no-mana" };
 
-      if (spell.type === "heal") {
-        const allies = combat.units.filter((u) => u.side === "player" && u.alive && u.hp < u.maxHp);
-        let aTarget = null;
-        let bestA = Infinity;
-        for (const a of allies) { const d = manhattan(unit, a); if (d < bestA) { bestA = d; aTarget = a; } }
-        if (!aTarget) return { ok: false, reason: "no-heal-target" };
+      if (spell.type === "damage") {
+        if (!defender || !canCast(unit, defender, spell)) return { ok: false, reason: "out-of-range" };
         unit.mp -= spell.cost;
         setSpellCooldown(combat, unit.uid, spell.id, SPELL_COOLDOWN);
-        aTarget.hp = Math.min(aTarget.maxHp, aTarget.hp + spell.power);
-        combat.log.push(`${unit.name} casts ${spell.name} on ${aTarget.name} for ${spell.power}.`);
+        resolveAttack(combat, unit, defender, spell);
         return { ok: true };
       }
 
+      // heal / ward — may target an ally explicitly, else pick the best one
+      let target = null;
+      if (action.targetUid) {
+        target = combat.units.find((u) => u.uid === action.targetUid && u.side === "player" && u.alive) || null;
+      }
+      if (!target) {
+        const allies = combat.units.filter((u) => u.side === "player" && u.alive);
+        if (spell.type === "heal") {
+          const wounded = allies.filter((a) => a.hp < a.maxHp);
+          if (wounded.length) {
+            wounded.sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp));
+            target = wounded[0];
+          }
+        } else {
+          target = allies.slice().sort((a, b) => (a.def - b.def) || (a.hp - b.hp))[0] || null;
+        }
+      }
+      if (!target) return { ok: false, reason: spell.type === "heal" ? "no-heal-target" : "no-target" };
+      if (manhattan(unit, target) > spell.range) return { ok: false, reason: "out-of-range" };
+
       unit.mp -= spell.cost;
       setSpellCooldown(combat, unit.uid, spell.id, SPELL_COOLDOWN);
-      resolveAttack(combat, unit, defender, spell);
+      if (spell.type === "heal") {
+        target.hp = Math.min(target.maxHp, target.hp + spell.power);
+        combat.log.push(`${unit.name} casts ${spell.name} on ${target.name} for ${spell.power}.`);
+      } else {
+        target.wardUntil = now + (spell.duration || 9000);
+        target.wardBonus = spell.power || 4;
+        combat.log.push(`${unit.name} sets ${spell.name} around ${target.name} (+${target.wardBonus} DEF).`);
+      }
       return { ok: true };
+    }
+    case "guard": {
+      unit.guardUntil = now + GUARD_TIME;
+      unit.guardBonus = GUARD_BONUS;
+      combatSay(combat, `${unit.name} braces — +${GUARD_BONUS} DEF for ${(GUARD_TIME / 1000).toFixed(0)}s.`);
+      return { ok: true };
+    }
+    case "hold": {
+      unit.hold = !unit.hold;
+      combatSay(combat, `${unit.name} will ${unit.hold ? "hold this ground" : "advance freely"}.`);
+      return { ok: true, hold: unit.hold };
     }
     case "pause": {
       combat.paused = !combat.paused;
@@ -153,6 +227,26 @@ export function tryPlayerAction(combat, action) {
     default:
       return { ok: false, reason: "bad-action" };
   }
+}
+
+// Keyboard / d-pad step: one tile, on a short recovery, cannot walk through the living
+export function nudgeUnit(combat, uid, dx, dy) {
+  const u = unitByUid(combat, uid);
+  if (!u || u.side !== "player" || u.alive === false) return { ok: false, reason: "no-selection" };
+  if (combat.phase === "over") return { ok: false, reason: "over" };
+  const now = performance.now();
+  if (now < (u.nudgeAt || 0)) return { ok: false, reason: "recovering" };
+  const nx = u.x + dx;
+  const ny = u.y + dy;
+  if (nx < 0 || ny < 0 || nx >= combat.terrain.w || ny >= combat.terrain.h) return { ok: false, reason: "edge" };
+  const blocked = combat.units.some((o) => o !== u && o.alive !== false && o.x === nx && o.y === ny);
+  if (blocked) return { ok: false, reason: "blocked" };
+  u.x = nx;
+  u.y = ny;
+  if (dx) u.face = Math.sign(dx);
+  u.nudgeAt = now + NUDGE_DELAY;
+  combat.movable = computeMovable(combat, u);
+  return { ok: true };
 }
 
 const MOVE_DELAY = 850; // ms between AI movement steps
@@ -220,8 +314,8 @@ function runSide(combat, side, now) {
     // 2) cast a damage spell if it can reach
     if (autoCastAt(combat, u, target, now)) continue;
 
-    // 3) otherwise close the distance
-    stepToward(combat, u, target);
+    // 3) otherwise close the distance — unless the hero has been told to hold
+    if (!u.hold) stepToward(combat, u, target);
   }
 }
 
@@ -402,6 +496,21 @@ function drawUnitBars(ctx, combat, u, cx, cy, now) {
     ctx.arc(cx + 24, cy - TILE * 0.5, 2.5, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  // stance / ward / hold markers
+  const marks = [];
+  if (now < (u.guardUntil || 0)) marks.push(["◆", "#7fa3e8"]);
+  if (now < (u.wardUntil || 0)) marks.push(["✦", "#8fd4ff"]);
+  if (u.hold) marks.push(["■", "#d8a53a"]);
+  if (marks.length) {
+    ctx.font = "11px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    marks.forEach(([sym, color], i) => {
+      ctx.fillStyle = color;
+      ctx.fillText(sym, cx - 26 + i * 11, cy - TILE * 0.5);
+    });
+  }
 }
 
 export function drawCombat(combat, canvas) {
@@ -426,6 +535,29 @@ export function drawCombat(combat, canvas) {
         ctx.strokeStyle = "rgba(143, 202, 122, 0.55)";
         ctx.lineWidth = 1;
         ctx.strokeRect(t.x * TILE + 2, t.y * TILE + 2, TILE - 4, TILE - 4);
+      }
+    }
+  }
+
+  // armed spell: outline every legal target so the choice is visible
+  if (combat.pendingSpell) {
+    const spell = SPELLS[combat.pendingSpell];
+    const caster = combat.units.find((u) => u.uid === combat.selectedId && u.alive);
+    if (spell && caster) {
+      for (const u of combat.units) {
+        if (!u.alive) continue;
+        const wantedSide = spell.type === "damage" ? "enemy" : "player";
+        if (u.side !== wantedSide) continue;
+        if (manhattan(caster, u) > spell.range) continue;
+        const tx = (u.ax ?? u.x) * TILE + TILE / 2;
+        const ty = (u.ay ?? u.y) * TILE + TILE / 2;
+        ctx.strokeStyle = spell.type === "damage" ? "rgba(232, 126, 96, 0.9)" : "rgba(126, 200, 255, 0.9)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.ellipse(tx, ty + 14, 22, 9, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
   }

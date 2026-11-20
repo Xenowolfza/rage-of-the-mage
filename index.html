@@ -37,14 +37,14 @@
           <button id="class-warrior" class="class-card">
             <span class="class-icon">⚔️</span>
             <span class="class-name">Warrior</span>
-            <span class="class-desc">Sword &amp; bow. High heart, steady blade. Can wield a <em>Power Strike</em>.</span>
-            <span class="class-stats">HP 40 · ATK 8 · DEF 6 · No magic</span>
+            <span class="class-desc">Sword &amp; bow. High heart, steady blade. Power Strike, Cleave, Aimed Shot.</span>
+            <span class="class-stats">HP 40 · ATK 8 · DEF 6 · Bow range 4</span>
           </button>
           <button id="class-mage" class="class-card">
             <span class="class-icon">🔥</span>
             <span class="class-name">Mage</span>
-            <span class="class-desc">Staff &amp; sorcery — the Will and the Word. Spells of flame, will and spirit.</span>
-            <span class="class-stats">HP 22 · MANA 12 · MAG 9 · Spells: Will Bolt, Flame, (Spirit Light)</span>
+            <span class="class-desc">Staff &amp; sorcery — the Will and the Word. Spells of flame, will, warding and spirit.</span>
+            <span class="class-stats">HP 30 · MANA 16 · MAG 9 · Will Bolt, Flame, Shield of the Will</span>
           </button>
         </div>
         <label class="dim" for="hero-name">Hero name</label>
@@ -81,6 +81,23 @@
             <span id="combat-encounter-name" class="combat-encounter-name"></span>
             <span id="combat-phase" class="combat-phase"></span>
             <button id="btn-combat-endturn" class="btn btn-primary">⏸ Pause</button>
+          </div>
+          <div id="combat-controls" class="combat-controls">
+            <div id="combat-hero-chips" class="hero-chips"></div>
+            <div class="combat-control-row">
+              <div class="dpad" aria-label="Move the selected hero">
+                <button type="button" class="btn btn-small dpad-up" id="btn-move-up" title="Move up (W / ↑)">▲</button>
+                <button type="button" class="btn btn-small dpad-left" id="btn-move-left" title="Move left (A / ←)">◀</button>
+                <button type="button" class="btn btn-small dpad-down" id="btn-move-down" title="Move down (S / ↓)">▼</button>
+                <button type="button" class="btn btn-small dpad-right" id="btn-move-right" title="Move right (D / →)">▶</button>
+              </div>
+              <div class="combat-modes">
+                <button type="button" class="btn btn-small" id="btn-combat-dash" title="Dash (F): next move covers twice the ground">Dash</button>
+                <button type="button" class="btn btn-small" id="btn-combat-hold" title="Hold (H): stay on this ground">Hold</button>
+                <button type="button" class="btn btn-small" id="btn-combat-guard" title="Guard (G): +3 defense for 5s">Guard</button>
+              </div>
+            </div>
+            <p class="combat-hint">WASD / arrows move · 1–4 select · Tab cycle · Q/E/R/T spells · F dash · G guard · H hold · Space pause · Esc cancel</p>
           </div>
         </div>
         <div class="combat-side">

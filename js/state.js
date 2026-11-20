@@ -47,6 +47,10 @@ export function createAllyUnit(allyId) {
     spells: [...t.spells],
     weapon: t.weapon, weaponBonus: t.weaponBonus, bow: t.bow, bowRange: t.bowRange,
     desc: t.desc,
+    canPower: t.cls === "warrior",
+    canCleave: t.cls === "warrior",
+    canAim: !!t.bow,
+    hold: false,
     isAlly: true, isPlayer: true, isBoss: false, alive: true,
     x: 4, y: 3,
   };
@@ -83,7 +87,7 @@ export function applyXp(character, amount) {
     character.maxMp += 3; character.mp += 3;
     character.atk += 1; character.def += 1; character.magic += 1;
     if (character.cls === "mage") {
-      if (character.level >= 2 && !character.spells.includes("flame")) character.spells.push("flame");
+      if (character.level >= 3 && !character.spells.includes("unmaking")) character.spells.push("unmaking");
       if (character.level >= 4 && !character.spells.includes("spirit-light")) character.spells.push("spirit-light");
     }
   }
@@ -148,8 +152,14 @@ export function checkCombatEnd(combat) {
 }
 
 // BFS movement
-export function computeMovable(combat, unit) {
+export function computeMovable(combat, unit, range) {
   const { w, h } = combat.terrain;
+  const max = range ?? unit.moves;
+  const blocked = new Set(
+    combat.units
+      .filter((u) => u.uid !== unit.uid && u.alive !== false)
+      .map((u) => `${u.x},${u.y}`)
+  );
   const dist = new Map();
   dist.set(`${unit.x},${unit.y}`, 0);
   const queue = [{ x: unit.x, y: unit.y, d: 0 }];
@@ -157,13 +167,14 @@ export function computeMovable(combat, unit) {
   while (queue.length) {
     const cur = queue.shift();
     if (cur.d > 0) reachable.push({ x: cur.x, y: cur.y, dist: cur.d });
-    if (cur.d >= unit.moves) continue;
+    if (cur.d >= max) continue;
     const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
     for (const [dx, dy] of dirs) {
       const nx = cur.x + dx, ny = cur.y + dy;
       const key = `${nx},${ny}`;
       if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
       if (dist.has(key)) continue;
+      if (blocked.has(key)) continue;
       dist.set(key, cur.d + 1);
       queue.push({ x: nx, y: ny, d: cur.d + 1 });
     }
@@ -173,35 +184,79 @@ export function computeMovable(combat, unit) {
 
 export function manhattan(a, b) { return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); }
 
-export function resolveAttack(combat, attacker, defender, spell) {
-  let dmg, kind;
+export function stanceDefense(defender, now) {
+  let bonus = 0;
+  if (now < (defender.guardUntil || 0)) bonus += defender.guardBonus || 0;
+  if (now < (defender.wardUntil || 0)) bonus += defender.wardBonus || 0;
+  return bonus;
+}
+
+export function resolveAttack(combat, attacker, defender, spell, mode) {
+  const now = performance.now();
+  const def = defender.def + stanceDefense(defender, now);
+  let dmg, kind, critChance = 0.15;
   if (spell) {
-    dmg = Math.round(attacker.magic * 0.6) + (spell.power || 0) - defender.def - (defender.magicDef || 0);
+    dmg = Math.round(attacker.magic * 0.6) + (spell.power || 0) - def - (defender.magicDef || 0);
     kind = `spell:${spell.id}`;
   } else {
-    dmg = attacker.atk + (attacker.weaponBonus || 0) - defender.def;
-    if (attacker.powerStriking) dmg = Math.round(dmg * 1.5);
-    kind = "strike";
+    let atk = attacker.atk + (attacker.weaponBonus || 0);
+    if (mode === "power") atk = Math.round(atk * 1.6);
+    if (mode === "aimed") critChance = 0.4;
+    dmg = atk - def;
+    kind = mode || "strike";
   }
-  const crit = Math.random() < 0.15;
+  const crit = Math.random() < critChance;
   if (crit) dmg = Math.round(dmg * 1.5);
   dmg = Math.max(1, dmg);
   defender.hp = Math.max(0, defender.hp - dmg);
 
   // animation cues for the sprite renderer
-  const now = performance.now();
   attacker.attackAt = now;
   if (defender.x !== attacker.x) attacker.face = Math.sign(defender.x - attacker.x);
   defender.hitAt = now;
   if (defender.hp <= 0 && defender.alive) defender.diedAt = now;
 
+  const verb = spell
+    ? `casts ${spell.name} at`
+    : mode === "power"
+      ? `lands a Power Strike on`
+      : mode === "cleave"
+        ? `cleaves into`
+        : mode === "aimed"
+          ? `looses an aimed shot at`
+          : `strikes`;
   combat.log.push(
-    spell
-      ? `${attacker.name} casts ${spell.name} at ${defender.name} for ${dmg}${crit ? " (CRIT!)" : ""}.`
-      : `${attacker.name} strikes ${defender.name} for ${dmg}${crit ? " (CRIT!)" : ""}.`
+    `${attacker.name} ${verb} ${defender.name} for ${dmg}${crit ? " (CRIT!)" : ""}.`
   );
-  if (combat.log.length > 80) combat.log.shift();
   if (defender.hp <= 0) defender.alive = false;
+
+  // Flame of Aldur spreads to the dead beside the target
+  if (spell && spell.area) {
+    const splash = Math.max(1, Math.round(dmg * 0.45));
+    for (const foe of combat.units) {
+      if (foe === defender || !foe.alive || foe.side === attacker.side) continue;
+      if (manhattan(foe, defender) > (spell.area || 1)) continue;
+      foe.hp = Math.max(0, foe.hp - splash);
+      foe.hitAt = now;
+      if (foe.hp <= 0) { foe.alive = false; foe.diedAt = now; }
+      combat.log.push(`${spell.name} spreads to ${foe.name} for ${splash}.`);
+    }
+  }
+
+  // Cleave sweeps the enemies crowding the warrior
+  if (mode === "cleave") {
+    const splash = Math.max(1, Math.round(dmg * 0.55));
+    for (const foe of combat.units) {
+      if (foe === defender || !foe.alive || foe.side === attacker.side) continue;
+      if (manhattan(foe, attacker) > 1) continue;
+      foe.hp = Math.max(0, foe.hp - splash);
+      foe.hitAt = now;
+      if (foe.hp <= 0) { foe.alive = false; foe.diedAt = now; }
+      combat.log.push(`${attacker.name}'s cleave catches ${foe.name} for ${splash}.`);
+    }
+  }
+
+  if (combat.log.length > 80) combat.log.shift();
   return { dmg, kind, crit };
 }
 
@@ -232,7 +287,10 @@ export function characterToUnit(character) {
     moves: character.moves,
     spells: [...character.spells],
     weapon: character.weapon, weaponBonus: character.weaponBonus, bow: character.bow, bowRange: character.bowRange,
-    powerStriking: character.cls === "warrior",
+    canPower: character.cls === "warrior",
+    canCleave: character.cls === "warrior",
+    canAim: !!character.bow,
+    hold: false,
     isAlly: false, isPlayer: true, isBoss: false, alive: true,
     x: 4, y: 3,
   };
